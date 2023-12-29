@@ -1,7 +1,16 @@
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+
 from src.api import auth
-from enum import Enum
+from src.application import carts
+from src.application.schemas import (
+    CartCheckout,
+    Cart,
+    CartDbEntry,
+    CartItem,
+    NewCart,
+    SearchSortOptions,
+    SearchSortOrder,
+)
 
 router = APIRouter(
     prefix="/carts",
@@ -9,28 +18,19 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
-class search_sort_options(str, Enum):
-    customer_name = "customer_name"
-    item_sku = "item_sku"
-    line_item_total = "line_item_total"
-    timestamp = "timestamp"
-
-class search_sort_order(str, Enum):
-    asc = "asc"
-    desc = "desc"   
 
 @router.get("/search/", tags=["search"])
 def search_orders(
     customer_name: str = "",
     potion_sku: str = "",
     search_page: str = "",
-    sort_col: search_sort_options = search_sort_options.timestamp,
-    sort_order: search_sort_order = search_sort_order.desc,
+    sort_col: SearchSortOptions = SearchSortOptions.TIMESTAMP,
+    sort_order: SearchSortOrder = SearchSortOrder.DESC,
 ):
     """
     Search for cart line items by customer name and/or potion sku.
 
-    Customer name and potion sku filter to orders that contain the 
+    Customer name and potion sku filter to orders that contain the
     string (case insensitive). If the filters aren't provided, no
     filtering occurs on the respective search term.
 
@@ -46,12 +46,13 @@ def search_orders(
 
     The response itself contains a previous and next page token (if
     such pages exist) and the results as an array of line items. Each
-    line item contains the line item id (must be unique), item sku, 
+    line item contains the line item id (must be unique), item sku,
     customer name, line item total (in gold), and timestamp of the order.
     Your results must be paginated, the max results you can return at any
     time is 5 total line items.
     """
 
+    # TODO: Implement
     return {
         "previous": "",
         "next": "",
@@ -67,39 +68,29 @@ def search_orders(
     }
 
 
-class NewCart(BaseModel):
-    customer: str
-
-
 @router.post("/")
 def create_cart(new_cart: NewCart):
-    """ """
-    return {"cart_id": 1}
+    """Creates a new shopping cart"""
+    return {"cart_id": carts.create_new_cart(new_cart.customer)}
 
 
-@router.get("/{cart_id}")
-def get_cart(cart_id: int):
-    """ """
-
-    return {}
-
-
-class CartItem(BaseModel):
-    quantity: int
+@router.get("/{cart_id}", response_model=list[CartDbEntry])
+def get_cart(cart: Cart = Depends(carts.get_by_id)):
+    """Returns an existing shopping cart"""
+    return list(cart.contents.values())
 
 
 @router.post("/{cart_id}/items/{item_sku}")
-def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
-    """ """
-
+def set_item_quantity(
+    item_sku: str, cart_item: CartItem, cart: Cart = Depends(carts.get_by_id)
+):
+    """Update item quantity in cart"""
+    carts.set_item_quantity(cart.cart_id, item_sku, cart_item.quantity)
     return "OK"
 
 
-class CartCheckout(BaseModel):
-    payment: str
-
 @router.post("/{cart_id}/checkout")
-def checkout(cart_id: int, cart_checkout: CartCheckout):
+def checkout(cart_checkout: CartCheckout, cart: Cart = Depends(carts.get_by_id)):
     """ """
-
+    # TODO: Implement
     return {"total_potions_bought": 1, "total_gold_paid": 50}

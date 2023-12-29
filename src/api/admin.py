@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
 from src.api import auth
 
 router = APIRouter(
@@ -7,6 +6,7 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(auth.get_api_key)],
 )
+
 
 @router.post("/reset")
 def reset():
@@ -19,11 +19,8 @@ def reset():
 
 @router.get("/shop_info/")
 def get_shop_info():
-    """ """
-
-    # TODO: Change me!
+    """Returns shop info"""
     return {
-        "shop_name": "Potion Shop",
-        "shop_owner": "Potion Seller",
+        "shop_name": "LittleAlchemyShop",
+        "shop_owner": "r-nasc",
     }
-

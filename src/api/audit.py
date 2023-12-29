@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from src.api import auth
-import math
+from src import database as db
+from src.application.schemas import AuditResult, InventoryDB
 
 router = APIRouter(
     prefix="/audit",
@@ -9,21 +9,23 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
+
 @router.get("/inventory")
 def get_inventory():
-    """ """
-    
-    return {"number_of_potions": 0, "ml_in_barrels": 0, "gold": 0}
+    """Provides the current inventory"""
+    with db.get_session() as sess:
+        inv = sess.get(InventoryDB, 1)
 
-class Result(BaseModel):
-    gold_match: bool
-    barrels_match: bool
-    potions_match: bool
+    return {
+        "number_of_potions": inv.num_red_potions,
+        "ml_in_barrels": inv.num_red_ml,
+        "gold": inv.gold,
+    }
 
-# Gets called once a day
+
 @router.post("/results")
-def post_audit_results(audit_explanation: Result):
-    """ """
+def post_audit_results(audit_explanation: AuditResult):
+    """Receives an audit result saying if the local inventory matches the remote one"""
     print(audit_explanation)
 
     return "OK"

@@ -1,8 +1,17 @@
-# Central Coast Cauldrons
+# What I learned
+- We can frame a SQLAlchemy Session as `with Session(engine) as session, session.begin():` to automatically begin/comit/rollback transactions. [Link](https://docs.sqlalchemy.org/en/20/orm/session_basics.html#framing-out-a-begin-commit-rollback-block)
+- Value changes should be done using the ORM Class field to prevent racing conditions during our transaction:
+  - (bad) `inst.gold = inst.gold + 1`  -> UPDATE inv SET gold = 31 WHERE inv.id = 1
+  - (good)  `inst.gold = Class.gold + 1` -> UPDATE inv SET gold = gold + 1 WHERE inv.id = 1
+- Lists/dicts don't notify SQLAlchemy ORM of changes on nested structures (not even MutableDict/MutableList) so we must implement ourselves a "NestedMutable" type (or use the `sqlalchemy-json` lib)
+
+
+# The Project
 
 Central Coast Cauldrons is a stubbed out API meant to serve as a starting point for learning how to build backend servies that integrate with a persistance layer. You will progressively build out your own forked version of the API and integrate with a progressively more sophisticated database backend. When you register your backend at the [Consortium of Concotions and Charms](https://potion-exchange.vercel.app/) simulated customers will shop at your store using your API. 
 
 The application's setting is a simulated fantasy RPG world with adventurers seeking to buy potions. You are one of many shops in this world that offer a variety (over 100k possibilities) of potions.
+
 
 ## Understanding the Game Mechanics
 

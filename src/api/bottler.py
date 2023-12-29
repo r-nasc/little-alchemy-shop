@@ -1,7 +1,12 @@
+import math
+
 from fastapi import APIRouter, Depends
-from enum import Enum
-from pydantic import BaseModel
+
+from src import database as db
 from src.api import auth
+from src.application.schemas import PotionInventory, InventoryDB
+
+ML_PER_BOTTLE = 100
 
 router = APIRouter(
     prefix="/bottler",
@@ -9,33 +14,26 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
-class PotionInventory(BaseModel):
-    potion_type: list[int]
-    quantity: int
 
 @router.post("/deliver")
 def post_deliver_bottles(potions_delivered: list[PotionInventory]):
-    """ """
+    """Event fired after a potion is bottled"""
     print(potions_delivered)
 
     return "OK"
 
+
 # Gets called 4 times a day
 @router.post("/plan")
 def get_bottle_plan():
-    """
-    Go from barrel to bottle.
-    """
+    """Event fired when a potion can be bottled"""
 
-    # Each bottle has a quantity of what proportion of red, blue, and
-    # green potion to add.
-    # Expressed in integers from 1 to 100 that must sum up to 100.
-
-    # Initial logic: bottle all barrels into red potions.
+    with db.get_session() as sess:
+        inv = sess.get(InventoryDB, 1)
 
     return [
-            {
-                "potion_type": [100, 0, 0, 0],
-                "quantity": 5,
-            }
-        ]
+        {
+            "potion_type": [100, 0, 0, 0],
+            "quantity": math.floor(inv.num_red_ml / ML_PER_BOTTLE),
+        }
+    ]
