@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from src.api import auth
-from src import database as db
-from src.application.schemas import AuditResult, InventoryDB
+from src.application.inventory import inventory
+from src.application.schemas import AuditResult
 
 router = APIRouter(
     prefix="/audit",
@@ -13,13 +13,13 @@ router = APIRouter(
 @router.get("/inventory")
 def get_inventory():
     """Provides the current inventory"""
-    with db.get_session() as sess:
-        inv = sess.get(InventoryDB, 1)
+    barrels = inventory.get_available_stock_ml()
+    potions = inventory.get_available_stock(potions_only=True)
 
     return {
-        "number_of_potions": inv.num_red_potions,
-        "ml_in_barrels": inv.num_red_ml,
-        "gold": inv.gold,
+        "number_of_potions": sum(pot.quantity for pot in potions),
+        "ml_in_barrels": sum(barrels.values()),
+        "gold": inventory.get_available_gold(),
     }
 
 

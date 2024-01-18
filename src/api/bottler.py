@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 
 from src import database as db
 from src.api import auth
-from src.application.schemas import PotionInventory, InventoryDB
+from src.application.schemas import PotionInventory
 
 ML_PER_BOTTLE = 100
 
@@ -28,12 +28,12 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory]):
 def get_bottle_plan():
     """Event fired when a potion can be bottled"""
 
-    with db.get_session() as sess:
-        inv = sess.get(InventoryDB, 1)
+    # with db.get_session() as sess:
+    #     inv = sess.get(InventoryDB, 1)
 
     return [
         {
             "potion_type": [100, 0, 0, 0],
-            "quantity": math.floor(inv.num_red_ml / ML_PER_BOTTLE),
+            "quantity": 0,  # math.floor(inv.num_red_ml / ML_PER_BOTTLE),
         }
     ]

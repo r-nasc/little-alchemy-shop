@@ -4,10 +4,10 @@ from functools import lru_cache
 import dotenv
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 
 from src.application.schemas import BaseDB as Base
-from src.application.schemas import CartDB as Cart
-from src.application.schemas import InventoryDB as Inventory
+from src.application.carts.schemas import CartDB as Cart
 
 dotenv.load_dotenv()
 

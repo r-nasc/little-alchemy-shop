@@ -1,13 +1,16 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 
 from src.api import auth
-from src.application import carts
-from src.application.schemas import (
-    CartCheckout,
+from src.application.carts import carts
+from src.application.carts.schemas import (
     Cart,
-    CartDbEntry,
+    CartCheckout,
+    CartContent,
     CartItem,
     NewCart,
+    SearchResponse,
     SearchSortOptions,
     SearchSortOrder,
 )
@@ -18,6 +21,8 @@ router = APIRouter(
     dependencies=[Depends(auth.get_api_key)],
 )
 
+ValidCart = Annotated[Cart, Depends(carts.get_by_id)]
+
 
 @router.get("/search/", tags=["search"])
 def search_orders(
@@ -26,7 +31,7 @@ def search_orders(
     search_page: str = "",
     sort_col: SearchSortOptions = SearchSortOptions.TIMESTAMP,
     sort_order: SearchSortOrder = SearchSortOrder.DESC,
-):
+) -> SearchResponse:
     """
     Search for cart line items by customer name and/or potion sku.
 
@@ -51,21 +56,14 @@ def search_orders(
     Your results must be paginated, the max results you can return at any
     time is 5 total line items.
     """
-
-    # TODO: Implement
-    return {
-        "previous": "",
-        "next": "",
-        "results": [
-            {
-                "line_item_id": 1,
-                "item_sku": "1 oblivion potion",
-                "customer_name": "Scaramouche",
-                "line_item_total": 50,
-                "timestamp": "2021-01-01T00:00:00Z",
-            }
-        ],
-    }
+    limit = 5
+    page = int(search_page or 0)
+    if sort_col == SearchSortOptions.TIMESTAMP:
+        sort_col = "updated_at"
+    ord_asc = sort_order == SearchSortOrder.ASC
+    return carts.query_all_paginated(
+        customer_name, potion_sku, sort_col, ord_asc, limit, page
+    )
 
 
 @router.post("/")
@@ -74,23 +72,20 @@ def create_cart(new_cart: NewCart):
     return {"cart_id": carts.create_new_cart(new_cart.customer)}
 
 
-@router.get("/{cart_id}", response_model=list[CartDbEntry])
-def get_cart(cart: Cart = Depends(carts.get_by_id)):
+@router.get("/{cart_id}", response_model=list[CartContent])
+def get_cart(cart: ValidCart):
     """Returns an existing shopping cart"""
-    return list(cart.contents.values())
+    return carts.get_contents_by_id(cart.cart_id)
 
 
 @router.post("/{cart_id}/items/{item_sku}")
-def set_item_quantity(
-    item_sku: str, cart_item: CartItem, cart: Cart = Depends(carts.get_by_id)
-):
+def set_item_quantity(item_sku: str, cart_item: CartItem, cart: ValidCart):
     """Update item quantity in cart"""
     carts.set_item_quantity(cart.cart_id, item_sku, cart_item.quantity)
     return "OK"
 
 
 @router.post("/{cart_id}/checkout")
-def checkout(cart_checkout: CartCheckout, cart: Cart = Depends(carts.get_by_id)):
-    """ """
-    # TODO: Implement
-    return {"total_potions_bought": 1, "total_gold_paid": 50}
+def checkout(cart_checkout: CartCheckout, cart: ValidCart):
+    """Updates the shop's inventory and deletes the cart"""
+    return carts.checkout_cart(cart.cart_id, cart_checkout.payment)
