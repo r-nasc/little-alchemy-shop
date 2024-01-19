@@ -1,9 +1,11 @@
 from logging import Logger
+
 from fastapi import HTTPException
 from sqlalchemy import desc
+
+from src import database as db
 from src.application.carts.schemas import Cart, CartContentDB, CartDB, SearchResponse
 from src.application.inventory import inventory
-from src import database as db
 
 logger = Logger(__name__)
 
@@ -69,12 +71,12 @@ def set_item_quantity(cart_id: int, item_sku: str, quantity: int):
             .where(CartContentDB.item_sku == item_sku)
         )
 
-        try:
-            res = query.one()
+        res = query.one_or_none()
+        if res:
             res.line_item_total = quantity
             if res.line_item_total == 0:
                 query.delete()
-        except db.NoResultFound:
+        else:
             new_entry = CartContentDB(
                 cart_id=cart_id, item_sku=item_sku, line_item_total=quantity
             )

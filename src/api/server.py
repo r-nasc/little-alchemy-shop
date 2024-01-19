@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI, exceptions, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
-from src.api import audit, carts, catalog, bottler, barrels, admin
+from src.api import audit, carts, catalog, bottler, barrels, admin, inventory
 from starlette.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -32,11 +32,13 @@ app.include_router(catalog.router)
 app.include_router(bottler.router)
 app.include_router(barrels.router)
 app.include_router(admin.router)
+app.include_router(inventory.router)
 
 
 @app.exception_handler(exceptions.RequestValidationError)
 @app.exception_handler(ValidationError)
 async def validation_exception_handler(request, exc):
+    """Generic Exception Handler"""
     logging.error(f"The client sent invalid data!: {exc}")
     exc_json = json.loads(exc.json())
     response = {"message": [], "data": None}
@@ -48,6 +50,7 @@ async def validation_exception_handler(request, exc):
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
+    """Time each request and add the result to the response header"""
     start_time = time.monotonic()
     response = await call_next(request)
     process_time = time.monotonic() - start_time
@@ -57,4 +60,5 @@ async def add_process_time_header(request: Request, call_next):
 
 @app.get("/")
 async def root():
+    """Welcome message as homepage"""
     return {"message": "Welcome to the Little Alchemy Shop."}

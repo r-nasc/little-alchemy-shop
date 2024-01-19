@@ -1,12 +1,13 @@
-import math
-
+# pylint: disable=missing-module-docstring
+from logging import Logger
 from fastapi import APIRouter, Depends
 
-from src import database as db
 from src.api import auth
-from src.application.schemas import PotionInventory
+from src.application.bottler import bottler
+from src.application.bottler.schemas import PotionInventory
 
-ML_PER_BOTTLE = 100
+logger = Logger(__name__)
+
 
 router = APIRouter(
     prefix="/bottler",
@@ -17,23 +18,15 @@ router = APIRouter(
 
 @router.post("/deliver")
 def post_deliver_bottles(potions_delivered: list[PotionInventory]):
-    """Event fired after a potion is bottled"""
-    print(potions_delivered)
-
-    return "OK"
+    """Event fired when a potion is bottled"""
+    logger.info("Bottles Received: %s", potions_delivered)
+    return bottler.receive_delivery(potions_delivered)
 
 
 # Gets called 4 times a day
 @router.post("/plan")
 def get_bottle_plan():
-    """Event fired when a potion can be bottled"""
-
-    # with db.get_session() as sess:
-    #     inv = sess.get(InventoryDB, 1)
-
-    return [
-        {
-            "potion_type": [100, 0, 0, 0],
-            "quantity": 0,  # math.floor(inv.num_red_ml / ML_PER_BOTTLE),
-        }
-    ]
+    """Event fired when a potions can be bottled"""
+    bottling_list = bottler.choose_potions_to_bottle()
+    logger.info("Bottling potions: %s", bottling_list)
+    return bottling_list

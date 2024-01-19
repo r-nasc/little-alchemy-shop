@@ -1,4 +1,4 @@
-# pylint: disable=not-callable, missing-class-docstring, no-name-in-module
+# pylint: disable=not-callable, missing-class-docstring, no-name-in-module, missing-module-docstring
 from enum import Enum
 import datetime as dt
 from pydantic import BaseModel

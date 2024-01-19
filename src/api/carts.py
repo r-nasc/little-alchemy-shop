@@ -1,3 +1,4 @@
+# pylint: disable=missing-module-docstring
 from typing import Annotated
 
 from fastapi import APIRouter, Depends

@@ -1,7 +1,11 @@
+# pylint: disable=missing-module-docstring
+from logging import Logger
 from fastapi import APIRouter, Depends
 from src.api import auth
 from src.application.inventory import inventory
 from src.application.schemas import AuditResult
+
+logger = Logger(__name__)
 
 router = APIRouter(
     prefix="/audit",
@@ -26,6 +30,5 @@ def get_inventory():
 @router.post("/results")
 def post_audit_results(audit_explanation: AuditResult):
     """Receives an audit result saying if the local inventory matches the remote one"""
-    print(audit_explanation)
-
+    logger.info("Audit Result %s", audit_explanation)
     return "OK"

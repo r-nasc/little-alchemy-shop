@@ -1,12 +1,18 @@
-from typing import Union
+# pylint: disable=missing-module-docstring, not-callable
 from sqlalchemy import func
 from src import database as db
+from src.application.barrels.schemas import Barrel
+from src.application.bottler.schemas import PotionInventory
 from src.application.carts.schemas import ItemSkuDB
-from src.application.inventory.schemas import LedgerEntryDB, StockItem, TransactionDB
+from src.application.inventory.schemas import (
+    IngredientDB,
+    IngredientLedgerDB,
+    LedgerEntryDB,
+    StockItem,
+    TransactionDB,
+)
 
 __all__ = ["buy_from", "sell_to", "sell_batch_to"]
-
-# pylint: disable=not-callable
 
 
 def register_transactions(items: list[dict]):
@@ -68,6 +74,30 @@ def sell_batch_to(items: list[dict], buyer: str):
     register_transactions(transactions)
 
 
+def update_sku_data(sku: str, price: float, colors: list[int]):
+    """Update or insert SKU data on database"""
+    with db.get_session() as sess:
+        query = sess.query(ItemSkuDB).filter(ItemSkuDB.item_sku == sku)
+
+        existing_sku = query.one_or_none()
+        if existing_sku:
+            if existing_sku.price == price:
+                return
+            with sess.begin():
+                existing_sku.price = price
+        else:
+            with sess.begin():
+                new_sku = ItemSkuDB(
+                    item_sku=sku,
+                    price=price,
+                    red_ml=colors[0],
+                    green_ml=colors[1],
+                    blue_ml=colors[2],
+                    dark_ml=colors[3],
+                )
+                sess.add(new_sku)
+
+
 def get_available_gold() -> int:
     """Returns the available gold"""
     with db.get_session() as sess:
@@ -99,15 +129,56 @@ def get_available_stock(sku: str = None, potions_only=False) -> list[StockItem]:
         return [StockItem(**x._asdict()) for x in query.all()]
 
 
-def get_available_stock_ml() -> Union[int, dict[str, int]]:
+def get_available_stock_ml() -> dict[str, int]:
     """Returns the available ml of each type"""
     with db.get_session() as sess:
-        qty = LedgerEntryDB.quantity_change
-        red_ml = func.sum(qty * ItemSkuDB.red_ml).label("red_ml")
-        green_ml = func.sum(qty * ItemSkuDB.green_ml).label("green_ml")
-        blue_ml = func.sum(qty * ItemSkuDB.blue_ml).label("blue_ml")
-        dark_ml = func.sum(qty * ItemSkuDB.dark_ml).label("dark_ml")
+        red_ml = func.sum(IngredientLedgerDB.red_ml_change).label("red_ml")
+        green_ml = func.sum(IngredientLedgerDB.green_ml_change).label("green_ml")
+        blue_ml = func.sum(IngredientLedgerDB.blue_ml_change).label("blue_ml")
+        dark_ml = func.sum(IngredientLedgerDB.dark_ml_change).label("dark_ml")
 
-        query = sess.query(red_ml, green_ml, blue_ml, dark_ml).join(ItemSkuDB)
-        query = query.filter(LedgerEntryDB.item_sku.icontains("BARREL"))
-        return query.one()._asdict()
+        return sess.query(red_ml, green_ml, blue_ml, dark_ml).one()._asdict()
+
+
+def get_cost_per_ml() -> dict[str, int]:
+    """Returns average cost per ml of each type"""
+    with db.get_session() as sess:
+        tbl = IngredientLedgerDB
+        cols = {
+            "red_ml": tbl.red_ml_change,
+            "green_ml": tbl.green_ml_change,
+            "blue_ml": tbl.blue_ml_change,
+            "dark_ml": tbl.dark_ml_change,
+        }
+
+        cost = func.sum(tbl.gold_cost)
+        costs_per_ml = {
+            lbl: sess.query(func.sum(col) / cost).filter(col > 0).scalar()
+            for lbl, col in cols.items()
+        }
+        return costs_per_ml
+
+
+def add_ingredients_to_stock(barrels: list[Barrel]):
+    """Add bought ingredients to stock"""
+    with db.get_session() as sess, sess.begin():
+        for barr in barrels:
+            qty = barr.quantity
+            desc = f"Bought {qty}x [{barr.potion_type}] for {barr.price}/pc"
+            transaction = IngredientDB(description=desc)
+            sess.add(transaction)
+
+            ledger_entry = IngredientLedgerDB(
+                transaction_id=transaction.id,
+                gold_cost=barr.price * qty,
+                red_ml_change=barr.potion_type[0] * qty,
+                green_ml_change=barr.potion_type[1] * qty,
+                blue_ml_change=barr.potion_type[2] * qty,
+                dark_ml_change=barr.potion_type[3] * qty,
+            )
+            sess.add(ledger_entry)
+
+
+def make_potions_from_ingredients(potions: list[PotionInventory]):
+    """Consume ingredients from stock and add potions"""
+    pass
