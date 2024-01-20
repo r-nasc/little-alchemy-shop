@@ -167,6 +167,11 @@ def add_ingredients_to_stock(barrels: list[Barrel]):
             sess.add(ledger_entry)
 
 
+def get_sku_from_ingredients(ing: list[int]):
+    """Returns the potion SKU from ingredients"""
+    return f"POTION_{ing[0]}_{ing[1]}_{ing[2]}_{ing[3]}"
+
+
 def add_potions_sub_ingredients(potions: list[PotionInventory]):
     """Consume ingredients from stock and add potions"""
     with db.get_session() as sess, sess.begin():
@@ -192,7 +197,7 @@ def add_potions_sub_ingredients(potions: list[PotionInventory]):
 
             ledger_entry = LedgerEntryDB(
                 transaction_id=tran2.id,
-                item_sku=f"POTION_{ing[0]}_{ing[1]}_{ing[2]}_{ing[3]}",
+                item_sku=get_sku_from_ingredients(ing),
                 quantity_change=qty,
                 gold_change=0,
             )
@@ -201,8 +206,8 @@ def add_potions_sub_ingredients(potions: list[PotionInventory]):
 
 def reset_progress(sess: db.Session):
     """Reset shop progress"""
-    sess.query(IngredientDB).delete()
     sess.query(IngredientLedgerDB).delete()
+    sess.query(IngredientDB).delete()
     sess.query(LedgerEntryDB).delete()
     sess.query(TransactionDB).delete()
 
