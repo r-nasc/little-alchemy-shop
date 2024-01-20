@@ -35,7 +35,7 @@ class SearchSortOrder(str, Enum):
 class ItemSkuDB(BaseDB):
     __tablename__ = "item_sku"
 
-    item_sku: Mapped[int] = mapped_column(primary_key=True)
+    item_sku: Mapped[str] = mapped_column(primary_key=True)
     red_ml: Mapped[int]
     green_ml: Mapped[int]
     blue_ml: Mapped[int]

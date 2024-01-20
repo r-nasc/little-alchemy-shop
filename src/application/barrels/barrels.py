@@ -19,7 +19,7 @@ def receive_delivery(barrels: list[Barrel]):
         for col, ml in enumerate(barrel.potion_type):
             ml_received[col] += ml * barrel.quantity
         inventory.update_sku_data(barrel.sku, barrel.price, barrel.potion_type)
-    inventory.buy_batch_from(bought_items, "BarrelSeller")
+    inventory.buy_from(bought_items, "BarrelSeller")
     inventory.add_ingredients_to_stock(ml_received)
     return "OK"
 
@@ -32,7 +32,7 @@ def choose_barrels_to_buy(wholesale_catalog: list[Barrel]):
     plan = []
     colors = ["red_ml", "green_ml", "blue_ml", "dark_ml"]
     for barrel in sorted(wholesale_catalog, key=itemgetter("price")):
-        qty_can_buy = gold_left // barrel.price
+        qty_can_buy = gold_left // max(barrel.price, 0.0001)
         if qty_can_buy == 0:
             continue
 

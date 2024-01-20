@@ -12,7 +12,7 @@ from src.application.inventory.schemas import (
     TransactionDB,
 )
 
-__all__ = ["buy_from", "sell_to", "sell_batch_to"]
+__all__ = ["buy_from", "sell_to", "sell_to"]
 
 
 def register_transactions(items: list[dict]):
@@ -30,19 +30,7 @@ def register_transactions(items: list[dict]):
             sess.add(ledger_entry)
 
 
-def buy_from(sku: str, quantity: int, unit_price: int, seller: str):
-    """Register a new transaction on the ledger"""
-    item = {"sku": sku, "quantity": quantity, "unit_price": unit_price}
-    buy_batch_from([item], seller)
-
-
-def sell_to(sku: str, quantity: int, unit_price: int, buyer: str):
-    """Register a new transaction on the ledger"""
-    item = {"sku": sku, "quantity": quantity, "unit_price": unit_price}
-    sell_batch_to([item], buyer)
-
-
-def buy_batch_from(items: list[dict], seller: str):
+def buy_from(items: list[dict], seller: str):
     """Register a batch of new transactions on the ledger"""
     transactions = []
     for item in items:
@@ -58,7 +46,7 @@ def buy_batch_from(items: list[dict], seller: str):
     register_transactions(transactions)
 
 
-def sell_batch_to(items: list[dict], buyer: str):
+def sell_to(items: list[dict], buyer: str):
     """Register a batch of new transactions on the ledger"""
     transactions = []
     for item in items:
@@ -109,23 +97,23 @@ def get_available_stock(sku: str = None, potions_only=False) -> list[StockItem]:
     """Returns the available sku stock"""
     with db.get_session() as sess:
         query = sess.query(
-            LedgerEntryDB.item_sku.label("item_sku"),
-            func.sum(LedgerEntryDB.quantity_change).label("quantity"),
+            ItemSkuDB.item_sku.label("item_sku"),
+            func.sum(func.coalesce(LedgerEntryDB.quantity_change, 0)).label("quantity"),
             ItemSkuDB.price.label("price"),
             ItemSkuDB.red_ml.label("red_ml"),
             ItemSkuDB.green_ml.label("green_ml"),
             ItemSkuDB.blue_ml.label("blue_ml"),
             ItemSkuDB.dark_ml.label("dark_ml"),
-        ).join(ItemSkuDB)
+        ).join(ItemSkuDB, isouter=True, full=True)
 
         if sku:
-            query = query.filter(LedgerEntryDB.item_sku == sku)
+            query = query.filter(ItemSkuDB.item_sku == sku)
 
         query = query.group_by(
-            LedgerEntryDB.item_sku, "price", "red_ml", "green_ml", "blue_ml", "dark_ml"
+            ItemSkuDB.item_sku, "price", "red_ml", "green_ml", "blue_ml", "dark_ml"
         )
         if potions_only:
-            query = query.filter(LedgerEntryDB.item_sku.icontains("POTION"))
+            query = query.filter(ItemSkuDB.item_sku.icontains("POTION"))
         return [StockItem(**x._asdict()) for x in query.all()]
 
 
@@ -163,22 +151,67 @@ def add_ingredients_to_stock(barrels: list[Barrel]):
     """Add bought ingredients to stock"""
     with db.get_session() as sess, sess.begin():
         for barr in barrels:
-            qty = barr.quantity
-            desc = f"Bought {qty}x [{barr.potion_type}] for {barr.price}/pc"
+            qty, pot_type = barr.quantity, barr.potion_type
+            desc = f"Bought {qty}x [{pot_type}] for {barr.price}/pc"
             transaction = IngredientDB(description=desc)
             sess.add(transaction)
 
             ledger_entry = IngredientLedgerDB(
                 transaction_id=transaction.id,
                 gold_cost=barr.price * qty,
-                red_ml_change=barr.potion_type[0] * qty,
-                green_ml_change=barr.potion_type[1] * qty,
-                blue_ml_change=barr.potion_type[2] * qty,
-                dark_ml_change=barr.potion_type[3] * qty,
+                red_ml_change=pot_type[0] * qty,
+                green_ml_change=pot_type[1] * qty,
+                blue_ml_change=pot_type[2] * qty,
+                dark_ml_change=pot_type[3] * qty,
             )
             sess.add(ledger_entry)
 
 
-def make_potions_from_ingredients(potions: list[PotionInventory]):
+def add_potions_sub_ingredients(potions: list[PotionInventory]):
     """Consume ingredients from stock and add potions"""
-    pass
+    with db.get_session() as sess, sess.begin():
+        for pot in potions:
+            qty, ing = pot.quantity, pot.potion_type
+            tran1 = IngredientDB(
+                description=f"Consumed {qty}x [{ing}] bottling potions"
+            )
+            sess.add(tran1)
+
+            ledger_entry = IngredientLedgerDB(
+                transaction_id=tran1.id,
+                gold_cost=0,
+                red_ml_change=ing[0] * qty,
+                green_ml_change=ing[1] * qty,
+                blue_ml_change=ing[2] * qty,
+                dark_ml_change=ing[3] * qty,
+            )
+            sess.add(ledger_entry)
+
+            tran2 = TransactionDB(description=f"Bottled {qty}x [{ing}] potions")
+            sess.add(tran2)
+
+            ledger_entry = LedgerEntryDB(
+                transaction_id=tran2.id,
+                item_sku=f"POTION_{ing[0]}_{ing[1]}_{ing[2]}_{ing[3]}",
+                quantity_change=qty,
+                gold_change=0,
+            )
+            sess.add(ledger_entry)
+
+
+def reset_progress(sess: db.Session):
+    """Reset shop progress"""
+    sess.query(IngredientDB).delete()
+    sess.query(IngredientLedgerDB).delete()
+    sess.query(LedgerEntryDB).delete()
+    sess.query(TransactionDB).delete()
+
+    tran = TransactionDB(description="Received 100 starting gold")
+    sess.add(tran)
+
+    ledger_entry = LedgerEntryDB(
+        transaction_id=tran.id,
+        quantity_change=0,
+        gold_change=100,
+    )
+    sess.add(ledger_entry)

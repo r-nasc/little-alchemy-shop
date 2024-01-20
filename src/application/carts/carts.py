@@ -4,7 +4,13 @@ from fastapi import HTTPException
 from sqlalchemy import desc
 
 from src import database as db
-from src.application.carts.schemas import Cart, CartContentDB, CartDB, SearchResponse
+from src.application.carts.schemas import (
+    Cart,
+    CartContentDB,
+    CartDB,
+    ItemSkuDB,
+    SearchResponse,
+)
 from src.application.inventory import inventory
 
 logger = Logger(__name__)
@@ -111,5 +117,12 @@ def checkout_cart(cart_id: int, payment: str):
             total_pot += tran["quantity"]
             total_gold += tran["unit_price"]
 
-        inventory.sell_batch_to(item_list, cart.customer_name)
+        inventory.sell_to(item_list, cart.customer_name)
     return {"total_potions_bought": total_pot, "total_gold_paid": total_gold}
+
+
+def reset_progress(sess: db.Session):
+    """Reset shop progress"""
+    sess.query(CartDB).delete()
+    sess.query(CartContentDB).delete()
+    sess.query(ItemSkuDB).delete()
